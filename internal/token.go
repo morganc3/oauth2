@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math"
 	"mime"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -185,7 +187,7 @@ func cloneURLValues(v url.Values) url.Values {
 	return v2
 }
 
-func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (*http.Request, *http.Response, *Token, error) {
+func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (string, string, *Token, error) {
 	needsAuthStyleProbe := authStyle == 0
 	if needsAuthStyleProbe {
 		if style, ok := lookupAuthStyle(tokenURL); ok {
@@ -197,7 +199,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
 	if err != nil {
-		return nil, nil, nil, err
+		return "", "", nil, err
 	}
 	resp, token, err := doTokenRoundTrip(ctx, req)
 	if err != nil && needsAuthStyleProbe {
@@ -225,7 +227,15 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	if token != nil && token.RefreshToken == "" {
 		token.RefreshToken = v.Get("refresh_token")
 	}
-	return req, resp, token, err
+	reqString, errDecoding := httputil.DumpRequest(req, true)
+	if errDecoding != nil {
+		log.Println("Error decoding exchange request")
+	}
+	respString, errDecoding := httputil.DumpResponse(resp, true)
+	if errDecoding != nil {
+		log.Println("Error decoding exchange response")
+	}
+	return string(reqString), string(respString), token, err
 }
 
 func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *Token, error) {

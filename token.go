@@ -155,13 +155,13 @@ func tokenFromInternal(t *internal.Token) *Token {
 // with an error..
 
 // morganc3 fork - updated to export this function so that url values can be directly provided
-func RetrieveToken(ctx context.Context, c *Config, v url.Values) (*http.Request, *http.Response, *Token, error) {
+func RetrieveToken(ctx context.Context, c *Config, v url.Values) (string, string, *Token, error) {
 	req, resp, tk, err := internal.RetrieveToken(ctx, c.ClientID, c.ClientSecret, c.Endpoint.TokenURL, v, internal.AuthStyle(c.Endpoint.AuthStyle))
 	if err != nil {
 		if rErr, ok := err.(*internal.RetrieveError); ok {
-			return nil, nil, nil, (*RetrieveError)(rErr)
+			return "", "", nil, (*RetrieveError)(rErr)
 		}
-		return nil, nil, nil, err
+		return "", "", nil, err
 	}
 	return req, resp, tokenFromInternal(tk), nil
 }

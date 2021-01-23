@@ -103,7 +103,7 @@ func (c *tokenSource) Token() (*oauth2.Token, error) {
 		v[k] = p
 	}
 
-	tk, err := internal.RetrieveToken(c.ctx, c.conf.ClientID, c.conf.ClientSecret, c.conf.TokenURL, v, internal.AuthStyle(c.conf.AuthStyle))
+	_, _, tk, err := internal.RetrieveToken(c.ctx, c.conf.ClientID, c.conf.ClientSecret, c.conf.TokenURL, v, internal.AuthStyle(c.conf.AuthStyle))
 	if err != nil {
 		if rErr, ok := err.(*internal.RetrieveError); ok {
 			return nil, (*oauth2.RetrieveError)(rErr)
