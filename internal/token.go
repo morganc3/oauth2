@@ -246,15 +246,15 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *Token, error) {
 	r, err := ctxhttp.Do(ctx, ContextClient(ctx), req)
 	if err != nil {
-		return nil, nil, err
+		return r, nil, err
 	}
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
+		return r, nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
 	if code := r.StatusCode; code < 200 || code > 299 {
-		return nil, nil, &RetrieveError{
+		return r, nil, &RetrieveError{
 			Response: r,
 			Body:     body,
 		}
@@ -266,7 +266,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *
 	case "application/x-www-form-urlencoded", "text/plain":
 		vals, err := url.ParseQuery(string(body))
 		if err != nil {
-			return nil, nil, err
+			return r, nil, err
 		}
 		token = &Token{
 			AccessToken:  vals.Get("access_token"),
@@ -282,7 +282,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *
 	default:
 		var tj tokenJSON
 		if err = json.Unmarshal(body, &tj); err != nil {
-			return nil, nil, err
+			return r, nil, err
 		}
 		token = &Token{
 			AccessToken:  tj.AccessToken,
@@ -294,7 +294,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *
 		json.Unmarshal(body, &token.Raw) // no error checks for optional fields
 	}
 	if token.AccessToken == "" {
-		return nil, nil, errors.New("oauth2: server response missing access_token")
+		return r, nil, errors.New("oauth2: server response missing access_token")
 	}
 	return r, token, nil
 }
