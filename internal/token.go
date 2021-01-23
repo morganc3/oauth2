@@ -198,6 +198,10 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		}
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
+	reqString, errDecoding := httputil.DumpRequest(req, true)
+	if errDecoding != nil {
+		log.Println("Error decoding exchange request")
+	}
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -217,6 +221,10 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		// So just try both ways.
 		authStyle = AuthStyleInParams // the second way we'll try
 		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
+		reqString, errDecoding = httputil.DumpRequest(req, true)
+		if errDecoding != nil {
+			log.Println("Error decoding exchange request")
+		}
 		resp, token, err = doTokenRoundTrip(ctx, req)
 	}
 	if needsAuthStyleProbe && err == nil {
@@ -227,10 +235,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	if token != nil && token.RefreshToken == "" {
 		token.RefreshToken = v.Get("refresh_token")
 	}
-	reqString, errDecoding := httputil.DumpRequest(req, true)
-	if errDecoding != nil {
-		log.Println("Error decoding exchange request")
-	}
+
 	respString, errDecoding := httputil.DumpResponse(resp, true)
 	if errDecoding != nil {
 		log.Println("Error decoding exchange response")
