@@ -195,7 +195,9 @@ func (c *Config) PasswordCredentialsToken(ctx context.Context, username, passwor
 	if len(c.Scopes) > 0 {
 		v.Set("scope", strings.Join(c.Scopes, " "))
 	}
-	return RetrieveToken(ctx, c, v)
+	_, _, tkn, err := RetrieveToken(ctx, c, v)
+
+	return tkn, err
 }
 
 // Exchange converts an authorization code into a token.
@@ -221,7 +223,9 @@ func (c *Config) Exchange(ctx context.Context, code string, opts ...AuthCodeOpti
 	for _, opt := range opts {
 		opt.setValue(v)
 	}
-	return RetrieveToken(ctx, c, v)
+	_, _, tkn, err := RetrieveToken(ctx, c, v)
+
+	return tkn, err
 }
 
 // Client returns an HTTP client using the provided token.
@@ -267,7 +271,7 @@ func (tf *tokenRefresher) Token() (*Token, error) {
 		return nil, errors.New("oauth2: token expired and refresh token is not set")
 	}
 
-	tk, err := RetrieveToken(tf.ctx, tf.conf, url.Values{
+	_, _, tk, err := RetrieveToken(tf.ctx, tf.conf, url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {tf.refreshToken},
 	})

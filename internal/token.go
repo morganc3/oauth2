@@ -185,7 +185,7 @@ func cloneURLValues(v url.Values) url.Values {
 	return v2
 }
 
-func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (*Token, error) {
+func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (*http.Request, *http.Response, *Token, error) {
 	needsAuthStyleProbe := authStyle == 0
 	if needsAuthStyleProbe {
 		if style, ok := lookupAuthStyle(tokenURL); ok {
@@ -197,9 +197,9 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	token, err := doTokenRoundTrip(ctx, req)
+	resp, token, err := doTokenRoundTrip(ctx, req)
 	if err != nil && needsAuthStyleProbe {
 		// If we get an error, assume the server wants the
 		// clientID & clientSecret in a different form.
@@ -215,7 +215,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		// So just try both ways.
 		authStyle = AuthStyleInParams // the second way we'll try
 		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
-		token, err = doTokenRoundTrip(ctx, req)
+		resp, token, err = doTokenRoundTrip(ctx, req)
 	}
 	if needsAuthStyleProbe && err == nil {
 		setAuthStyle(tokenURL, authStyle)
@@ -225,21 +225,21 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	if token != nil && token.RefreshToken == "" {
 		token.RefreshToken = v.Get("refresh_token")
 	}
-	return token, err
+	return req, resp, token, err
 }
 
-func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
+func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *Token, error) {
 	r, err := ctxhttp.Do(ctx, ContextClient(ctx), req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	r.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
+		return nil, nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
 	if code := r.StatusCode; code < 200 || code > 299 {
-		return nil, &RetrieveError{
+		return nil, nil, &RetrieveError{
 			Response: r,
 			Body:     body,
 		}
@@ -251,7 +251,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	case "application/x-www-form-urlencoded", "text/plain":
 		vals, err := url.ParseQuery(string(body))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		token = &Token{
 			AccessToken:  vals.Get("access_token"),
@@ -267,7 +267,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	default:
 		var tj tokenJSON
 		if err = json.Unmarshal(body, &tj); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		token = &Token{
 			AccessToken:  tj.AccessToken,
@@ -279,9 +279,9 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 		json.Unmarshal(body, &token.Raw) // no error checks for optional fields
 	}
 	if token.AccessToken == "" {
-		return nil, errors.New("oauth2: server response missing access_token")
+		return nil, nil, errors.New("oauth2: server response missing access_token")
 	}
-	return token, nil
+	return r, token, nil
 }
 
 type RetrieveError struct {
