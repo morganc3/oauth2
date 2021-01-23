@@ -234,7 +234,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *
 		return nil, nil, err
 	}
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
-	r.Body.Close()
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
