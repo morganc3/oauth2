@@ -5,6 +5,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -196,9 +197,14 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		}
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
+
+	bodyBytes, _ := ioutil.ReadAll(req.Body) // save for later, as body gets removed in doTokenRoundTrip
+
 	if err != nil {
+		req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
 		return req, nil, nil, err
 	}
+
 	resp, token, err := doTokenRoundTrip(ctx, req)
 	if err != nil && needsAuthStyleProbe {
 		// If we get an error, assume the server wants the
@@ -206,7 +212,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		// See https://code.google.com/p/goauth2/issues/detail?id=31 for background.
 		// In summary:
 		// - Reddit only accepts client secret in the Authorization header
-		// - Dropbox accepts either it in URL param or Auth header, but not both.
+		// - Dropbox accepts eithser it in URL param or Auth header, but not both.
 		// - Google only accepts URL param (not spec compliant?), not Auth header
 		// - Stripe only accepts client secret in Auth header with Bearer method, not Basic
 		//
@@ -227,6 +233,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		token.RefreshToken = v.Get("refresh_token")
 	}
 
+	req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
 	return req, resp, token, err
 }
 
@@ -235,6 +242,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *
 	if err != nil {
 		return r, nil, err
 	}
+
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 
 	if err != nil {
