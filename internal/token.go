@@ -198,10 +198,11 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
 
-	bodyBytes, _ := ioutil.ReadAll(req.Body) // save for later, as body gets removed in doTokenRoundTrip
+	var bodyBytesBuffer bytes.Buffer
+	io.Copy(&bodyBytesBuffer, req.Body) // save for later, as body gets removed in doTokenRoundTrip
 
 	if err != nil {
-		req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
+		req.Body = ioutil.NopCloser(&bodyBytesBuffer)
 		return req, nil, nil, err
 	}
 
@@ -233,7 +234,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		token.RefreshToken = v.Get("refresh_token")
 	}
 
-	req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
+	req.Body = ioutil.NopCloser(&bodyBytesBuffer)
 	return req, resp, token, err
 }
 
