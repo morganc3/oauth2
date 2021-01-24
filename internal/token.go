@@ -198,11 +198,12 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
 
-	var bodyBytesBuffer bytes.Buffer
-	io.Copy(&bodyBytesBuffer, req.Body) // save for later, as body gets removed in doTokenRoundTrip
+	var bodyBytes []byte
+	bodyBytes, _ = ioutil.ReadAll(req.Body)                 // store this, so we can re-store it later
+	req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes)) // after reading, we have to re-set the req.Body
 
 	if err != nil {
-		req.Body = ioutil.NopCloser(&bodyBytesBuffer)
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 		return req, nil, nil, err
 	}
 
@@ -222,7 +223,8 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		// So just try both ways.
 		authStyle = AuthStyleInParams // the second way we'll try
 		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
-
+		bodyBytes, _ = ioutil.ReadAll(req.Body)                 // store this, so we can re-store it later
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes)) // after reading, we have to re-set the req.Body
 		resp, token, err = doTokenRoundTrip(ctx, req)
 	}
 	if needsAuthStyleProbe && err == nil {
@@ -234,7 +236,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		token.RefreshToken = v.Get("refresh_token")
 	}
 
-	req.Body = ioutil.NopCloser(&bodyBytesBuffer)
+	req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	return req, resp, token, err
 }
 
