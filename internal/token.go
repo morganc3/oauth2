@@ -11,11 +11,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"mime"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -187,7 +185,7 @@ func cloneURLValues(v url.Values) url.Values {
 	return v2
 }
 
-func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (string, string, *Token, error) {
+func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (*http.Request, *http.Response, *Token, error) {
 	needsAuthStyleProbe := authStyle == 0
 	if needsAuthStyleProbe {
 		if style, ok := lookupAuthStyle(tokenURL); ok {
@@ -198,12 +196,8 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		}
 	}
 	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
-	reqString, errDecoding := httputil.DumpRequest(req, true)
-	if errDecoding != nil {
-		log.Println("Error decoding exchange request")
-	}
 	if err != nil {
-		return "", "", nil, err
+		return req, nil, nil, err
 	}
 	resp, token, err := doTokenRoundTrip(ctx, req)
 	if err != nil && needsAuthStyleProbe {
@@ -221,10 +215,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		// So just try both ways.
 		authStyle = AuthStyleInParams // the second way we'll try
 		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
-		reqString, errDecoding = httputil.DumpRequest(req, true)
-		if errDecoding != nil {
-			log.Println("Error decoding exchange request")
-		}
+
 		resp, token, err = doTokenRoundTrip(ctx, req)
 	}
 	if needsAuthStyleProbe && err == nil {
@@ -236,11 +227,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		token.RefreshToken = v.Get("refresh_token")
 	}
 
-	respString, errDecoding := httputil.DumpResponse(resp, true)
-	if errDecoding != nil {
-		log.Println("Error decoding exchange response")
-	}
-	return string(reqString), string(respString), token, err
+	return req, resp, token, err
 }
 
 func doTokenRoundTrip(ctx context.Context, req *http.Request) (*http.Response, *Token, error) {
